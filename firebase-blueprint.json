@@ -1,0 +1,96 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Core user authentication and status information",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "emailVerified": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email"]
+    },
+    "Profile": {
+      "title": "Profile",
+      "description": "User profile and preferences",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string", "enum": ["adult", "caregiver"] },
+        "ageRange": { "type": "string" },
+        "goals": { "type": "array", "items": { "type": "string" } },
+        "reminderTime": { "type": "string" },
+        "reminderStyle": { "type": "string" },
+        "theme": { "type": "string", "enum": ["light", "dark"] },
+        "onboarded": { "type": "boolean" },
+        "currentDay": { "type": "number" },
+        "completedDays": { "type": "array", "items": { "type": "number" } }
+      }
+    },
+    "HabitLog": {
+      "title": "HabitLog",
+      "description": "Daily habit tracking record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "sleep": { "type": "boolean" },
+        "hydration": { "type": "boolean" },
+        "movement": { "type": "boolean" },
+        "brainChallenge": { "type": "boolean" },
+        "stressManagement": { "type": "boolean" },
+        "socialConnection": { "type": "boolean" },
+        "readingLearning": { "type": "boolean" },
+        "brainFood": { "type": "boolean" }
+      }
+    },
+    "SelfAssessment": {
+      "title": "SelfAssessment",
+      "description": "Bi-weekly self-assessment scores",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "mentalClarity": { "type": "number" },
+        "memory": { "type": "number" },
+        "focus": { "type": "number" },
+        "mood": { "type": "number" },
+        "energy": { "type": "number" },
+        "sleepQuality": { "type": "number" }
+      }
+    },
+    "CaregiverNote": {
+      "title": "CaregiverNote",
+      "description": "Notes logged by caregivers",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "observation": { "type": "string" },
+        "category": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User account status"
+    },
+    "/profiles/{userId}": {
+      "schema": "Profile",
+      "description": "User profile data"
+    },
+    "/habitLogs/{logId}": {
+      "schema": "HabitLog",
+      "description": "Daily habit logs"
+    },
+    "/assessments/{assessmentId}": {
+      "schema": "SelfAssessment",
+      "description": "User self-assessments"
+    },
+    "/caregiverNotes/{noteId}": {
+      "schema": "CaregiverNote",
+      "description": "Caregiver observations"
+    }
+  }
+}
