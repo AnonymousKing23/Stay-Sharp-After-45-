@@ -26,7 +26,6 @@ import {
   Sun,
   MessageSquare,
   BarChart3,
-  LogOut,
   RefreshCw,
   Sparkles,
   ShieldCheck,
@@ -37,9 +36,6 @@ import {
   Camera,
   Trash2
 } from 'lucide-react';
-import { onAuthStateChanged, signOut, updateProfile } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot, collection, query, where, orderBy } from 'firebase/firestore';
-import { auth, db } from './firebase';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { 
   UserSettings, 
@@ -68,8 +64,17 @@ import {
   DialogTrigger,
   DialogFooter
 } from './components/ui/dialog';
-import { AuthScreen, VerificationPendingScreen } from './components/Auth';
 import { AnalyticsScreen } from './components/Analytics';
+import { AuthScreen } from './components/Auth';
+import { 
+  onAuthStateChanged, 
+  signInWithPopup, 
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut, 
+  User as FirebaseUser 
+} from 'firebase/auth';
+import { auth, googleProvider } from './firebase';
 
 // --- Components ---
 
@@ -803,6 +808,7 @@ const ProfileScreen = ({
   caregiverNotes,
   onAddNote,
   requestNotificationPermission,
+  onLogout,
   user
 }: { 
   settings: UserSettings, 
@@ -812,14 +818,15 @@ const ProfileScreen = ({
   caregiverNotes: CaregiverNote[],
   onAddNote: (note: string, category: any) => void,
   requestNotificationPermission: () => void,
-  user: any
+  onLogout: () => void,
+  user: FirebaseUser | null
 }) => {
   const [showCaregiverScreen, setShowCaregiverScreen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
+    if (!file) return;
 
     setIsUploading(true);
     try {
@@ -828,10 +835,6 @@ const ProfileScreen = ({
         const base64String = reader.result as string;
         // Save to local settings
         setSettings({ ...settings, profilePicture: base64String });
-        // Save to Firestore
-        if (user) {
-          await setDoc(doc(db, 'profiles', user.uid), { profilePicture: base64String }, { merge: true });
-        }
       };
       reader.readAsDataURL(file);
     } catch (error) {
@@ -842,12 +845,8 @@ const ProfileScreen = ({
   };
 
   const handlePhotoDelete = async () => {
-    if (!user) return;
     try {
       setSettings({ ...settings, profilePicture: undefined });
-      if (user) {
-        await setDoc(doc(db, 'profiles', user.uid), { profilePicture: null }, { merge: true });
-      }
     } catch (error) {
       console.error("Error deleting photo:", error);
     }
@@ -870,8 +869,10 @@ const ProfileScreen = ({
         <div className="flex items-center gap-4">
           <div className="relative group">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary overflow-hidden border-2 border-primary/20">
-              {settings.profilePicture || user?.photoURL ? (
-                <img src={settings.profilePicture || user.photoURL} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              {user?.photoURL ? (
+                <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : settings.profilePicture ? (
+                <img src={settings.profilePicture} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
                 <User className="w-8 h-8" />
               )}
@@ -880,7 +881,7 @@ const ProfileScreen = ({
               <Camera className="w-4 h-4" />
               <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} disabled={isUploading} />
             </label>
-            {user?.photoURL && (
+            {settings.profilePicture && (
               <button 
                 onClick={handlePhotoDelete}
                 className="absolute -top-1 -right-1 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center shadow-md hover:bg-destructive/90 transition-colors opacity-0 group-hover:opacity-100"
@@ -891,12 +892,10 @@ const ProfileScreen = ({
           </div>
           <div>
             <h1 className="text-2xl font-heading font-bold text-primary">{user?.displayName || 'Your Profile'}</h1>
-            <p className="text-sm text-muted-foreground capitalize">{settings.role} Mode • {settings.ageRange}</p>
+            <p className="text-sm text-muted-foreground">{user?.email}</p>
+            <p className="text-[10px] text-muted-foreground uppercase mt-1 tracking-widest">{settings.role} Mode • {settings.ageRange}</p>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => signOut(auth)} className="text-muted-foreground hover:text-destructive">
-          <LogOut className="w-5 h-5" />
-        </Button>
       </header>
 
       <div className="space-y-6">
@@ -1010,22 +1009,21 @@ const ProfileScreen = ({
 
         <div className="pt-8 space-y-4">
           <Button 
-            variant="outline" 
-            className="w-full h-14 border-destructive/20 text-destructive hover:bg-destructive/10 font-bold"
-            onClick={onReset}
+            className="w-full h-14 font-bold bg-primary hover:bg-primary/90 rounded-2xl"
+            onClick={onLogout}
           >
-            <RefreshCw className="w-4 h-4 mr-2" /> Reset All Data
+            Sign Out
           </Button>
           <Button 
             variant="ghost" 
-            className="w-full h-12 text-muted-foreground hover:text-destructive"
-            onClick={() => signOut(auth)}
+            className="w-full h-14 text-destructive hover:bg-destructive/5 font-medium underline"
+            onClick={onReset}
           >
-            <LogOut className="w-4 h-4 mr-2" /> Sign Out
+            Reset Application Data
           </Button>
           <p className="text-[10px] text-center text-muted-foreground/40 px-8">
-            Stay Sharp After 45 • Version 1.2.0<br/>
-            Your data is securely synced with your account.
+            Stay Sharp After 45 • Version 2.0.0<br/>
+            Secured by Firebase Authentication.
           </p>
         </div>
       </div>
@@ -1514,8 +1512,10 @@ const LandingPage = ({ onStart }: { onStart: () => void }) => {
 };
 
 export default function App() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [signingIn, setSigningIn] = useState(false);
+
   const [settings, setSettings] = useLocalStorage<UserSettings>('ss45_settings', {
     role: 'adult',
     ageRange: '45-54',
@@ -1557,12 +1557,48 @@ export default function App() {
   const [hasStarted, setHasStarted] = useLocalStorage<boolean>('ss45_has_started', false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
       setAuthLoading(false);
     });
     return () => unsubscribe();
   }, []);
+
+  const handleLogin = async () => {
+    setSigningIn(true);
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Login failed:", error);
+    } finally {
+      setSigningIn(false);
+    }
+  };
+
+  const handleEmailAuth = async (email: string, pass: string, isSignUp: boolean) => {
+    setSigningIn(true);
+    try {
+      if (isSignUp) {
+        await createUserWithEmailAndPassword(auth, email, pass);
+      } else {
+        await signInWithEmailAndPassword(auth, email, pass);
+      }
+    } catch (error) {
+      console.error("Email auth failed:", error);
+      throw error;
+    } finally {
+      setSigningIn(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setHasStarted(false); // Optionally reset landing state on logout
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
 
   useEffect(() => {
     if (settings.theme === 'dark') {
@@ -1572,82 +1608,10 @@ export default function App() {
     }
   }, [settings.theme]);
 
-  // Sync with Firestore
-  useEffect(() => {
-    if (!user || !user.emailVerified) return;
-
-    // Sync Profile
-    const profileRef = doc(db, 'profiles', user.uid);
-    const unsubProfile = onSnapshot(profileRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setSettings(prev => ({ ...prev, ...data }));
-        if (data.completedDays) setCompletedDays(data.completedDays);
-      } else {
-        // Initialize profile if it doesn't exist
-        setDoc(profileRef, {
-          role: settings.role,
-          ageRange: settings.ageRange,
-          goals: settings.goals,
-          reminderTime: settings.reminderTime,
-          reminderStyle: settings.reminderStyle,
-          theme: settings.theme,
-          onboarded: settings.onboarded,
-          currentDay: currentDay,
-          completedDays: completedDays
-        });
-      }
-    });
-
-    // Sync Habit Logs
-    const habitsQuery = query(collection(db, 'habitLogs'), where('userId', '==', user.uid));
-    const unsubHabits = onSnapshot(habitsQuery, (querySnap) => {
-      const logs: Record<string, HabitLog> = {};
-      querySnap.forEach((doc) => {
-        const data = doc.data() as HabitLog;
-        logs[data.date] = data;
-      });
-      setHabitLogs(logs);
-    });
-
-    // Sync Assessments
-    const assessmentsQuery = query(collection(db, 'assessments'), where('userId', '==', user.uid), orderBy('date', 'desc'));
-    const unsubAssessments = onSnapshot(assessmentsQuery, (querySnap) => {
-      const list: SelfAssessment[] = [];
-      querySnap.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() } as SelfAssessment);
-      });
-      setAssessments(list);
-    });
-
-    // Sync Caregiver Notes
-    const notesQuery = query(collection(db, 'caregiverNotes'), where('userId', '==', user.uid), orderBy('date', 'desc'));
-    const unsubNotes = onSnapshot(notesQuery, (querySnap) => {
-      const list: CaregiverNote[] = [];
-      querySnap.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() } as CaregiverNote);
-      });
-      setCaregiverNotes(list);
-    });
-
-    return () => {
-      unsubProfile();
-      unsubHabits();
-      unsubAssessments();
-      unsubNotes();
-    };
-  }, [user]);
-
   const handleCompleteTask = async () => {
     if (!completedDays.includes(currentDay)) {
       const newCompleted = [...completedDays, currentDay];
       setCompletedDays(newCompleted);
-      
-      if (user) {
-        await setDoc(doc(db, 'profiles', user.uid), { 
-          completedDays: newCompleted
-        }, { merge: true });
-      }
       
       if (currentDay === 14 || currentDay === 29) {
         setShowAssessment(true);
@@ -1656,41 +1620,27 @@ export default function App() {
   };
 
   const handleToggleHabit = async (habit: keyof HabitLog) => {
-    const updatedLog = { ...todayHabitLog, [habit]: !todayHabitLog[habit], userId: user?.uid };
+    const updatedLog = { ...todayHabitLog, [habit]: !todayHabitLog[habit] };
     setHabitLogs({ ...habitLogs, [todayStr]: updatedLog });
-    if (user) {
-      const logId = `${user.uid}_${todayStr}`;
-      await setDoc(doc(db, 'habitLogs', logId), updatedLog);
-    }
   };
 
   const handleAddCaregiverNote = async (observation: string, category: any) => {
     const newNote = {
-      userId: user?.uid,
+      id: Math.random().toString(36).substr(2, 9),
       date: new Date().toISOString(),
       observation,
       category
     };
-    if (user) {
-      await setDoc(doc(collection(db, 'caregiverNotes')), newNote);
-    } else {
-      const localNote = { id: Math.random().toString(36).substr(2, 9), ...newNote };
-      setCaregiverNotes([localNote as CaregiverNote, ...caregiverNotes]);
-    }
+    setCaregiverNotes([newNote as CaregiverNote, ...caregiverNotes]);
   };
 
   const handleCompleteAssessment = async (scores: Omit<SelfAssessment, 'id' | 'date'>) => {
     const newAssessment = {
-      userId: user?.uid,
+      id: Math.random().toString(36).substr(2, 9),
       date: new Date().toISOString(),
       ...scores
     };
-    if (user) {
-      await setDoc(doc(collection(db, 'assessments')), newAssessment);
-    } else {
-      const localAssessment = { id: Math.random().toString(36).substr(2, 9), ...newAssessment };
-      setAssessments([localAssessment as SelfAssessment, ...assessments]);
-    }
+    setAssessments([newAssessment as SelfAssessment, ...assessments]);
     setShowAssessment(false);
   };
 
@@ -1708,21 +1658,6 @@ export default function App() {
     const now = new Date().toISOString();
     const resetSettings = { ...settings, onboarded: true, startDate: now };
     setSettings(resetSettings);
-
-    if (user) {
-      // Clear Firestore data for this user
-      try {
-        await setDoc(doc(db, 'profiles', user.uid), { 
-          completedDays: [],
-          onboarded: true,
-          startDate: now
-        }, { merge: true });
-        // Note: We don't delete habitLogs/assessments collections here for safety, 
-        // but we clear the local view. In a real app, you might want a more thorough cleanup.
-      } catch (error) {
-        console.error("Error resetting cloud data:", error);
-      }
-    }
     
     setShowResetDialog(false);
   };
@@ -1781,9 +1716,6 @@ export default function App() {
     const permission = await Notification.requestPermission();
     if (permission === "granted") {
       setSettings({ ...settings, remindersEnabled: true });
-      if (user) {
-        await setDoc(doc(db, 'profiles', user.uid), { remindersEnabled: true }, { merge: true });
-      }
     }
   };
 
@@ -1804,16 +1736,24 @@ export default function App() {
     }
   };
 
-  if (authLoading) return <LoadingScreen />;
-  if (!user && !hasStarted) return <LandingPage onStart={() => setHasStarted(true)} />;
-  if (!user) return <AuthScreen />;
-  if (!user.emailVerified) return <VerificationPendingScreen user={user} />;
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!hasStarted) return <LandingPage onStart={() => setHasStarted(true)} />;
+
+  if (!user) {
+    return <AuthScreen onGoogleLogin={handleLogin} onEmailAuth={handleEmailAuth} isLoading={signingIn} />;
+  }
 
   if (!settings.onboarded) {
-    return <Onboarding onComplete={async (s) => {
+    return <Onboarding onComplete={(s) => {
       const onboardSettings = { ...s, startDate: new Date().toISOString() };
       setSettings(onboardSettings);
-      if (user) await setDoc(doc(db, 'profiles', user.uid), onboardSettings, { merge: true });
     }} />;
   }
 
@@ -1867,6 +1807,7 @@ export default function App() {
             caregiverNotes={caregiverNotes}
             onAddNote={handleAddCaregiverNote}
             requestNotificationPermission={requestNotificationPermission}
+            onLogout={handleLogout}
             user={user}
           />
         );
@@ -1896,7 +1837,7 @@ export default function App() {
           <DialogHeader>
             <DialogTitle>Reset All Data?</DialogTitle>
             <DialogDescription>
-              This will clear your progress and history. Your account will remain logged in.
+              This will clear your progress and history from this device.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-row gap-2 sm:flex-row">
