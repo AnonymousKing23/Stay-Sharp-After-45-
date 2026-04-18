@@ -31,8 +31,10 @@ export const mapAuthError = (error: any): string => {
     case 'auth/network-request-failed':
       return 'A network error occurred. Please check your internet connection and try again.';
 
+    case 'auth/popup-closed-by-user':
+      return 'The sign-in popup was closed before completion. Please try again.';
+
     default:
-      // Fallback for unexpected errors or generic messages
       if (error?.message?.includes('auth/invalid-credential')) {
         return 'The email or password you entered is incorrect. Please check your credentials and try again.';
       }

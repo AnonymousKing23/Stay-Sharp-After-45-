@@ -1570,6 +1570,7 @@ export default function App() {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
       console.error("Login failed:", error);
+      throw error;
     } finally {
       setSigningIn(false);
     }
@@ -1594,7 +1595,6 @@ export default function App() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      setHasStarted(false); // Optionally reset landing state on logout
     } catch (error) {
       console.error("Logout failed:", error);
     }
@@ -1686,51 +1686,44 @@ export default function App() {
           requireInteraction: true
         });
         
-        // Vibration for alarm feel
         if ("vibrate" in navigator) {
           navigator.vibrate([500, 200, 500, 200, 500]);
         }
         
-        // Play a louder/alarm-like sound
         const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-        audio.loop = settings.reminderStyle === 'strict';
         audio.play().catch(e => console.log("Audio play blocked by browser"));
-        
-        // Stop audio after 10 seconds if strict
-        if (settings.reminderStyle === 'strict') {
-          setTimeout(() => {
-            audio.pause();
-            audio.currentTime = 0;
-          }, 10000);
-        }
       }
     };
 
     const interval = setInterval(checkReminders, 60000); // Check every minute
+    checkReminders(); // Initial check
     return () => clearInterval(interval);
   }, [settings.remindersEnabled, settings.reminderTime, settings.reminderStyle]);
 
   const requestNotificationPermission = async () => {
     if (!("Notification" in window)) return;
     
-    const permission = await Notification.requestPermission();
-    if (permission === "granted") {
-      setSettings({ ...settings, remindersEnabled: true });
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission === "granted") {
+        setSettings(prev => ({ ...prev, remindersEnabled: true }));
+        new Notification("Notifications Enabled", {
+          body: "You'll now receive daily reminders for your protocol.",
+          icon: "/favicon.ico"
+        });
+      }
+    } catch (error) {
+      console.error("Error requesting notification permission:", error);
     }
   };
 
   const handleRemindLater = () => {
     if ("Notification" in window && Notification.permission === "granted") {
-      // Schedule a one-off notification in 1 minute for demo/test purposes, 
-      // or just trigger immediately if the user wants to see it working.
-      new Notification("Reminder Set", {
-        body: "We'll remind you again soon to stay on track!",
+      new Notification("Reminder Delayed", {
+        body: "We'll remind you again in a bit to stay on track!",
         icon: "/favicon.ico"
       });
-      
-      // In a real app, we'd use a background worker or server-side push.
-      // For this demo, we'll just show a toast-like feedback.
-      alert("We'll remind you again in an hour! (Demo: Notification triggered)");
+      alert("We'll remind you again later today!");
     } else {
       requestNotificationPermission();
     }

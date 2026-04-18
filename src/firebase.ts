@@ -2,22 +2,18 @@ import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
+// These values should be provided by the user in their environment variables or manually updated here.
 const firebaseConfig = {
-  apiKey: "AIzaSyAqps0Ul03Iu7grg428AyRgUP5x2xfswyo",
-  authDomain: "stay-sharp-after-45.firebaseapp.com",
-  projectId: "stay-sharp-after-45",
-  storageBucket: "stay-sharp-after-45.firebasestorage.app",
-  messagingSenderId: "966107071016",
-  appId: "1:966107071016:web:09b304af0dc14a0d13ab1d",
-  measurementId: "G-QZS6R8FR3G"
+  apiKey: "AIzaSyDOUThHmMkvqHZOE47KnYvyUE0tF96dZFE",
+  authDomain: "stay-sharp-after-45-ed494.firebaseapp.com",
+  projectId: "stay-sharp-after-45-ed494",
+  storageBucket: "stay-sharp-after-45-ed494.firebasestorage.app",
+  messagingSenderId: "465743953611",
+  appId: "1:465743953611:web:9ab1fc074512384b21e54e",
+  measurementId: "G-73N8ND789B"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-
-// Initialize Services
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
-
-export default app;

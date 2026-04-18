@@ -8,7 +8,7 @@ import { Label } from './ui/label';
 import { mapAuthError } from '../lib/authUtils';
 
 interface AuthScreenProps {
-  onGoogleLogin: () => void;
+  onGoogleLogin: () => Promise<void>;
   onEmailAuth: (email: string, pass: string, isSignUp: boolean) => Promise<void>;
   isLoading: boolean;
 }
@@ -133,7 +133,14 @@ export const AuthScreen = ({ onGoogleLogin, onEmailAuth, isLoading }: AuthScreen
               variant="outline"
               size="lg" 
               className="w-full h-12 text-sm rounded-xl border-border/50 hover:bg-muted/30 flex items-center justify-center gap-3 transition-all mb-6"
-              onClick={onGoogleLogin}
+              onClick={async () => {
+                setError(null);
+                try {
+                  await onGoogleLogin();
+                } catch (err: any) {
+                  setError(mapAuthError(err));
+                }
+              }}
               disabled={isLoading}
             >
               <img 
