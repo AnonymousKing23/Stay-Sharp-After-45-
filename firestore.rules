@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // User Profile & Settings
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) 
+        && request.resource.data.settings.onboarded is bool
+        && request.resource.data.keys().hasAll(['settings', 'updatedAt']);
+      allow update: if isOwner(userId)
+        && request.resource.data.settings.onboarded is bool
+        && request.resource.data.updatedAt == request.time;
+        
+      // Habit Logs Subcollection
+      match /habit_logs/{date} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId) && isValidId(date);
+      }
+      
+      // Assessments Subcollection
+      match /assessments/{assessmentId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId) && isValidId(assessmentId);
+      }
+      
+      // Caregiver Notes Subcollection
+      match /caregiver_notes/{noteId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId) && isValidId(noteId);
+      }
+      
+      // Progress Tracking
+      match /progress/{type} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId) && isValidId(type);
+      }
+    }
+  }
+}

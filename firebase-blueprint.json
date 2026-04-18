@@ -1,0 +1,89 @@
+{
+  "entities": {
+    "UserSettings": {
+      "title": "User Settings",
+      "description": "Preferences and profile configuration for the cognitive protocol.",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string", "enum": ["adult", "caregiver"] },
+        "ageRange": { "type": "string", "enum": ["45-54", "55-64", "65-74", "75+"] },
+        "goals": { "type": "array", "items": { "type": "string" } },
+        "reminderTime": { "type": "string", "format": "time" },
+        "reminderStyle": { "type": "string", "enum": ["gentle", "strict"] },
+        "remindersEnabled": { "type": "boolean" },
+        "theme": { "type": "string", "enum": ["light", "dark"] },
+        "onboarded": { "type": "boolean" },
+        "startDate": { "type": "string", "format": "date-time" }
+      },
+      "required": ["role", "ageRange", "remindersEnabled", "onboarded"]
+    },
+    "HabitLog": {
+      "title": "Habit Log",
+      "description": "Daily record of habit completion and health metrics.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "sleep": { "type": "boolean" },
+        "hydration": { "type": "boolean" },
+        "movement": { "type": "boolean" },
+        "brainChallenge": { "type": "boolean" },
+        "stressManagement": { "type": "boolean" },
+        "socialConnection": { "type": "boolean" },
+        "readingLearning": { "type": "boolean" },
+        "brainFood": { "type": "boolean" },
+        "mood": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "energy": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "focus": { "type": "integer", "minimum": 1, "maximum": 5 }
+      },
+      "required": ["date"]
+    },
+    "SelfAssessment": {
+      "title": "Self Assessment",
+      "description": "Bi-weekly cognitive check-in scores.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "mentalClarity": { "type": "integer" },
+        "memory": { "type": "integer" },
+        "focus": { "type": "integer" },
+        "mood": { "type": "integer" },
+        "energy": { "type": "integer" },
+        "sleepQuality": { "type": "integer" }
+      }
+    },
+    "CaregiverNote": {
+      "title": "Caregiver Note",
+      "description": "Observations recorded by a caregiver.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "observation": { "type": "string" },
+        "category": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserSettings",
+      "description": "Root user profile document."
+    },
+    "/users/{userId}/habit_logs/{date}": {
+      "schema": "HabitLog",
+      "description": "Subcollection for daily logs."
+    },
+    "/users/{userId}/assessments/{assessmentId}": {
+      "schema": "SelfAssessment",
+      "description": "Subcollection for progress reports."
+    },
+    "/users/{userId}/caregiver_notes/{noteId}": {
+      "schema": "CaregiverNote",
+      "description": "Subcollection for third-party observations."
+    },
+    "/users/{userId}/progress/completed_days": {
+      "schema": { "type": "object", "properties": { "days": { "type": "array" } } },
+      "description": "Current protocol progression state."
+    }
+  }
+}

@@ -68,13 +68,13 @@ import { AnalyticsScreen } from './components/Analytics';
 import { AuthScreen } from './components/Auth';
 import { 
   onAuthStateChanged, 
-  signInWithPopup, 
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut, 
   User as FirebaseUser 
 } from 'firebase/auth';
-import { auth, googleProvider } from './firebase';
+import { auth } from './firebase';
+import * as dataService from './services/dataService';
 
 // --- Components ---
 
@@ -809,7 +809,8 @@ const ProfileScreen = ({
   onAddNote,
   requestNotificationPermission,
   onLogout,
-  user
+  user,
+  onUpdateSettings
 }: { 
   settings: UserSettings, 
   setSettings: (s: UserSettings) => void,
@@ -819,7 +820,8 @@ const ProfileScreen = ({
   onAddNote: (note: string, category: any) => void,
   requestNotificationPermission: () => void,
   onLogout: () => void,
-  user: FirebaseUser | null
+  user: FirebaseUser | null,
+  onUpdateSettings: (s: UserSettings) => void
 }) => {
   const [showCaregiverScreen, setShowCaregiverScreen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -831,23 +833,22 @@ const ProfileScreen = ({
     setIsUploading(true);
     try {
       const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64String = reader.result as string;
-        // Save to local settings
-        setSettings({ ...settings, profilePicture: base64String });
-      };
-      reader.readAsDataURL(file);
-    } catch (error) {
-      console.error("Error uploading photo:", error);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handlePhotoDelete = async () => {
-    try {
-      setSettings({ ...settings, profilePicture: undefined });
-    } catch (error) {
+        reader.onloadend = async () => {
+          const base64String = reader.result as string;
+          onUpdateSettings({ ...settings, profilePicture: base64String });
+        };
+        reader.readAsDataURL(file);
+      } catch (error) {
+        console.error("Error uploading photo:", error);
+      } finally {
+        setIsUploading(false);
+      }
+    };
+  
+    const handlePhotoDelete = async () => {
+      try {
+        onUpdateSettings({ ...settings, profilePicture: undefined });
+      } catch (error) {
       console.error("Error deleting photo:", error);
     }
   };
@@ -906,13 +907,11 @@ const ProfileScreen = ({
               <div 
                 className="p-4 flex items-center justify-between cursor-pointer hover:bg-muted/30 transition-colors"
                 onClick={(e) => {
-                  // Only trigger if not clicking the switch directly
                   if ((e.target as HTMLElement).closest('button[role="switch"]')) return;
-                  
                   if (!settings.remindersEnabled) {
                     requestNotificationPermission();
                   } else {
-                    setSettings({ ...settings, remindersEnabled: false });
+                    onUpdateSettings({ ...settings, remindersEnabled: false });
                   }
                 }}
               >
@@ -924,13 +923,13 @@ const ProfileScreen = ({
                   checked={!!settings.remindersEnabled} 
                   onCheckedChange={(checked) => {
                     if (checked) requestNotificationPermission();
-                    else setSettings({ ...settings, remindersEnabled: false });
+                    else onUpdateSettings({ ...settings, remindersEnabled: false });
                   }}
                 />
               </div>
               <div 
                 className="p-4 flex items-center justify-between cursor-pointer hover:bg-muted/30 transition-colors"
-                onClick={() => setSettings({ ...settings, theme: settings.theme === 'dark' ? 'light' : 'dark' })}
+                onClick={() => onUpdateSettings({ ...settings, theme: settings.theme === 'dark' ? 'light' : 'dark' })}
               >
                 <div className="flex items-center gap-3">
                   <Moon className="w-5 h-5 text-primary/60" />
@@ -938,12 +937,12 @@ const ProfileScreen = ({
                 </div>
                 <Switch 
                   checked={!!(settings.theme === 'dark')} 
-                  onCheckedChange={(checked) => setSettings({ ...settings, theme: checked ? 'dark' : 'light' })}
+                  onCheckedChange={(checked) => onUpdateSettings({ ...settings, theme: checked ? 'dark' : 'light' })}
                 />
               </div>
               <div 
                 className="p-4 flex items-center justify-between cursor-pointer hover:bg-muted/30 transition-colors"
-                onClick={() => setSettings({ ...settings, role: settings.role === 'caregiver' ? 'adult' : 'caregiver' })}
+                onClick={() => onUpdateSettings({ ...settings, role: settings.role === 'caregiver' ? 'adult' : 'caregiver' })}
               >
                 <div className="flex items-center gap-3">
                   <HeartPulse className="w-5 h-5 text-primary/60" />
@@ -951,7 +950,7 @@ const ProfileScreen = ({
                 </div>
                 <Switch 
                   checked={!!(settings.role === 'caregiver')} 
-                  onCheckedChange={(checked) => setSettings({ ...settings, role: checked ? 'caregiver' : 'adult' })}
+                  onCheckedChange={(checked) => onUpdateSettings({ ...settings, role: checked ? 'caregiver' : 'adult' })}
                 />
               </div>
             </div>
@@ -1555,26 +1554,71 @@ export default function App() {
   };
 
   const [hasStarted, setHasStarted] = useLocalStorage<boolean>('ss45_has_started', false);
+  const [isCloudLoading, setIsCloudLoading] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       setAuthLoading(false);
+
+      if (currentUser) {
+        setIsCloudLoading(true);
+        try {
+          // Load data from Firestore
+          const [cloudSettings, cloudLogs, cloudAssessments, cloudNotes, cloudProgress] = await Promise.all([
+            dataService.getUserSettings(currentUser.uid),
+            dataService.getHabitLogs(currentUser.uid),
+            dataService.getAssessments(currentUser.uid),
+            dataService.getCaregiverNotes(currentUser.uid),
+            dataService.getCompletedDays(currentUser.uid)
+          ]);
+
+          if (cloudSettings) setSettings(cloudSettings);
+          if (Object.keys(cloudLogs).length > 0) setHabitLogs(cloudLogs);
+          if (cloudAssessments.length > 0) setAssessments(cloudAssessments);
+          if (cloudNotes.length > 0) setCaregiverNotes(cloudNotes);
+          if (cloudProgress.length > 0) setCompletedDays(cloudProgress);
+
+          // If local storage has data but cloud is empty, sync local to cloud
+          if (!cloudSettings && settings.onboarded) {
+             await dataService.saveUserSettings(currentUser.uid, settings);
+             await dataService.saveCompletedDays(currentUser.uid, completedDays);
+             // Upload habit logs one by one if cloud was empty
+             for (const log of Object.values(habitLogs)) {
+               await dataService.saveHabitLog(currentUser.uid, log);
+             }
+             for (const ass of assessments) {
+               await dataService.saveAssessment(currentUser.uid, ass);
+             }
+             for (const note of caregiverNotes) {
+                await dataService.saveCaregiverNote(currentUser.uid, note);
+             }
+          }
+        } catch (err) {
+          console.error("Error syncing with cloud:", err);
+        } finally {
+          setIsCloudLoading(false);
+        }
+      } else {
+        // Log out: Clear device state to allow next person to log in
+        setSettings({
+          role: 'adult',
+          ageRange: '45-54',
+          goals: [],
+          reminderTime: '08:00',
+          reminderStyle: 'gentle',
+          remindersEnabled: false,
+          theme: 'light',
+          onboarded: false,
+        });
+        setCompletedDays([]);
+        setHabitLogs({});
+        setAssessments([]);
+        setCaregiverNotes([]);
+      }
     });
     return () => unsubscribe();
-  }, []);
-
-  const handleLogin = async () => {
-    setSigningIn(true);
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error("Login failed:", error);
-      throw error;
-    } finally {
-      setSigningIn(false);
-    }
-  };
+  }, [user?.uid]); // Re-sync if UID changes (unlikely without logout)
 
   const handleEmailAuth = async (email: string, pass: string, isSignUp: boolean) => {
     setSigningIn(true);
@@ -1613,6 +1657,10 @@ export default function App() {
       const newCompleted = [...completedDays, currentDay];
       setCompletedDays(newCompleted);
       
+      if (user) {
+        await dataService.saveCompletedDays(user.uid, newCompleted);
+      }
+      
       if (currentDay === 14 || currentDay === 29) {
         setShowAssessment(true);
       }
@@ -1622,6 +1670,9 @@ export default function App() {
   const handleToggleHabit = async (habit: keyof HabitLog) => {
     const updatedLog = { ...todayHabitLog, [habit]: !todayHabitLog[habit] };
     setHabitLogs({ ...habitLogs, [todayStr]: updatedLog });
+    if (user) {
+      await dataService.saveHabitLog(user.uid, updatedLog);
+    }
   };
 
   const handleAddCaregiverNote = async (observation: string, category: any) => {
@@ -1631,7 +1682,11 @@ export default function App() {
       observation,
       category
     };
-    setCaregiverNotes([newNote as CaregiverNote, ...caregiverNotes]);
+    const updatedNotes = [newNote as CaregiverNote, ...caregiverNotes];
+    setCaregiverNotes(updatedNotes);
+    if (user) {
+      await dataService.saveCaregiverNote(user.uid, newNote as CaregiverNote);
+    }
   };
 
   const handleCompleteAssessment = async (scores: Omit<SelfAssessment, 'id' | 'date'>) => {
@@ -1640,7 +1695,11 @@ export default function App() {
       date: new Date().toISOString(),
       ...scores
     };
-    setAssessments([newAssessment as SelfAssessment, ...assessments]);
+    const updatedAssessments = [newAssessment as SelfAssessment, ...assessments];
+    setAssessments(updatedAssessments);
+    if (user) {
+      await dataService.saveAssessment(user.uid, newAssessment as SelfAssessment);
+    }
     setShowAssessment(false);
   };
 
@@ -1729,10 +1788,19 @@ export default function App() {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || isCloudLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+        <div className="flex flex-col items-center gap-6">
+          <div className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-sm text-muted-foreground font-medium uppercase tracking-[0.2em]"
+          >
+            {isCloudLoading ? 'Synchronizing Protocol...' : 'Reclaiming Edge...'}
+          </motion.p>
+        </div>
       </div>
     );
   }
@@ -1740,13 +1808,16 @@ export default function App() {
   if (!hasStarted) return <LandingPage onStart={() => setHasStarted(true)} />;
 
   if (!user) {
-    return <AuthScreen onGoogleLogin={handleLogin} onEmailAuth={handleEmailAuth} isLoading={signingIn} />;
+    return <AuthScreen onEmailAuth={handleEmailAuth} isLoading={signingIn} />;
   }
 
   if (!settings.onboarded) {
-    return <Onboarding onComplete={(s) => {
+    return <Onboarding onComplete={async (s) => {
       const onboardSettings = { ...s, startDate: new Date().toISOString() };
       setSettings(onboardSettings);
+      if (user) {
+        await dataService.saveUserSettings(user.uid, onboardSettings);
+      }
     }} />;
   }
 
@@ -1802,6 +1873,12 @@ export default function App() {
             requestNotificationPermission={requestNotificationPermission}
             onLogout={handleLogout}
             user={user}
+            onUpdateSettings={async (newSettings) => {
+              setSettings(newSettings);
+              if (user) {
+                await dataService.saveUserSettings(user.uid, newSettings);
+              }
+            }}
           />
         );
       default:

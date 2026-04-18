@@ -34,6 +34,9 @@ export const mapAuthError = (error: any): string => {
     case 'auth/popup-closed-by-user':
       return 'The sign-in popup was closed before completion. Please try again.';
 
+    case 'auth/unauthorized-domain':
+      return 'This domain is not authorized for Google Sign-In. Please add this URL to your Firebase Console Authorized Domains.';
+
     default:
       if (error?.message?.includes('auth/invalid-credential')) {
         return 'The email or password you entered is incorrect. Please check your credentials and try again.';

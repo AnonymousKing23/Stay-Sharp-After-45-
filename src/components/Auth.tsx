@@ -8,12 +8,11 @@ import { Label } from './ui/label';
 import { mapAuthError } from '../lib/authUtils';
 
 interface AuthScreenProps {
-  onGoogleLogin: () => Promise<void>;
   onEmailAuth: (email: string, pass: string, isSignUp: boolean) => Promise<void>;
   isLoading: boolean;
 }
 
-export const AuthScreen = ({ onGoogleLogin, onEmailAuth, isLoading }: AuthScreenProps) => {
+export const AuthScreen = ({ onEmailAuth, isLoading }: AuthScreenProps) => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -123,34 +122,6 @@ export const AuthScreen = ({ onGoogleLogin, onEmailAuth, isLoading }: AuthScreen
                 <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Button>
             </form>
-
-            <div className="relative py-4 mb-4">
-              <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border/50"></span></div>
-              <div className="relative flex justify-center text-xs uppercase tracking-widest"><span className="bg-card px-4 text-muted-foreground/50">Or continue with</span></div>
-            </div>
-
-            <Button 
-              variant="outline"
-              size="lg" 
-              className="w-full h-12 text-sm rounded-xl border-border/50 hover:bg-muted/30 flex items-center justify-center gap-3 transition-all mb-6"
-              onClick={async () => {
-                setError(null);
-                try {
-                  await onGoogleLogin();
-                } catch (err: any) {
-                  setError(mapAuthError(err));
-                }
-              }}
-              disabled={isLoading}
-            >
-              <img 
-                src="https://www.google.com/favicon.ico" 
-                alt="Google" 
-                className="w-4 h-4 grayscale-[0.5] group-hover:grayscale-0" 
-                referrerPolicy="no-referrer"
-              />
-              Google Account
-            </Button>
             
             <p className="text-center text-sm text-muted-foreground border-t border-border/50 pt-8">
               {isSignUp ? 'Already on the protocol?' : "New to the protocol?"}{' '}
